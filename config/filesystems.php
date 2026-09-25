@@ -38,6 +38,13 @@ return [
             'report' => false,
         ],
 
+        'currency_feed' => [
+            'driver' => 'local',
+            'root' => storage_path('app/feeds/currency'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
