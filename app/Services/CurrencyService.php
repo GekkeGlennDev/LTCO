@@ -9,9 +9,30 @@ use App\Models\ExchangeRate;
 use App\ValueObjects\Name;
 use App\ValueObjects\Rate;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Cache\Repository as Cache;
+use Illuminate\Support\Collection;
 
 class CurrencyService
 {
+    private const string CACHE_KEY = 'currencies';
+
+    public function __construct(private readonly Cache $cache)
+    {
+    }
+
+    public function all(): Collection
+    {
+        return collect($this->cache->rememberForever(
+            self::CACHE_KEY,
+            fn () => Currency::query()->pluck('name')->all(),
+        ));
+    }
+
+    public function flushCache(): void
+    {
+        $this->cache->forget(self::CACHE_KEY);
+    }
+
     public function findOrCreate(Name $name): Currency
     {
         return Currency::query()->createOrFirst(['name' => $name->value]);

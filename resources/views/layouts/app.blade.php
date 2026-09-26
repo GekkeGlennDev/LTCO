@@ -17,7 +17,7 @@
         .card { background: #fff; border: 1px solid #d0d7de; border-radius: 6px; padding: 1.25rem; margin-bottom: 1rem; }
         label { display: block; font-weight: 600; margin-bottom: .25rem; }
         label.inline { display: flex; gap: .5rem; align-items: center; font-weight: normal; }
-        input[type=text], input[type=password], input[type=email] { width: 100%; padding: .5rem; border: 1px solid #d0d7de; border-radius: 6px; font: inherit; }
+        input[type=text], input[type=password], input[type=email], input[type=number], select { width: 100%; padding: .5rem; border: 1px solid #d0d7de; border-radius: 6px; font: inherit; }
         .field { margin-bottom: 1rem; }
         .hint { color: #59636e; font-size: .875rem; }
         .error { color: #d1242f; font-size: .875rem; margin-top: .25rem; }
@@ -31,6 +31,8 @@
         th, td { text-align: left; padding: .5rem; border-bottom: 1px solid #d0d7de; vertical-align: middle; }
         td.actions { display: flex; gap: .75rem; justify-content: flex-end; align-items: center; }
         form.inline { display: inline; }
+        .converter { display: grid; grid-template-columns: 280px 1fr; gap: 1rem; align-items: start; }
+        @media (max-width: 700px) { .converter { grid-template-columns: 1fr; } }
         .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
     </style>
 </head>
