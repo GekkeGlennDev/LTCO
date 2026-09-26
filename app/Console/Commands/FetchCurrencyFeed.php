@@ -4,186 +4,157 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\DTOs\ExchangeRateInfo;
+use App\Models\Currency;
+use App\Services\CurrencyService;
+use App\ValueObjects\Name;
+use App\ValueObjects\Rate;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
+use InvalidArgumentException;
 
-#[Signature('app:fetch-currency-feed')]
+#[Signature('app:fetch-currency-feed {--c|currency=}')]
 #[Description('Fetch currency feeds')]
 class FetchCurrencyFeed extends Command
 {
-    const string URL = 'https://www.floatrates.com/daily/%s.json';
+    private const string CURRENCY_FEED_URL = 'https://www.floatrates.com/daily/%s.json';
 
-    public function handle(): void
+    private readonly CurrencyService $currencyService;
+    private readonly CarbonImmutable $today;
+
+    public function handle(): int
     {
-        $date = Carbon::today()->format('Y-m-d');
-        $disk = Storage::disk('currency_feed');
+        $this->currencyService = app()->make(CurrencyService::class);
 
-        $feeds = $this->supportedFeeds();
-        $this->output->progressStart(count($feeds));
+        $this->today = CarbonImmutable::today();
+        $this->info('Fetching currency feeds for ' . $this->today->toDateString());
 
-        foreach ($feeds as $feed) {
-            $fileName = sprintf('%s/%s.json', $date, $feed);
-            $disk->put($fileName, file_get_contents(sprintf(self::URL, $feed)));
-            $this->output->progressAdvance();
+        $option = $this->option('currency');
+
+        // When no option is given, process known currencies.
+        if (!$option) {
+            return $this->processKnownCurrencies();
         }
 
-        $this->output->progressFinish();
+        try {
+            return $this->processSingeItem(new Name($option));
+        } catch (InvalidArgumentException $e) {
+            $this->error($e->getMessage());
+        }
+
+        return self::FAILURE;
     }
 
-    // todo, Improve.
-    private function supportedFeeds(): array
+    private function processKnownCurrencies(): int
     {
-        return [
-            'eur',
-            'aud',
-            'cad',
-            'chf',
-            'cny',
-            'gbp',
-            'hkd',
-            'idr',
-            'inr',
-            'jpy',
-            'krw',
-            'myr',
-            'nzd',
-            'pgk',
-            'php',
-            'sgd',
-            'thb',
-            'twd',
-            'usd',
-            'vnd',
-            'aed',
-            'qar',
-            'sar',
-            'dkk',
-            'egp',
-            'ils',
-            'jod',
-            'nok',
-            'sek',
-            'zar',
-            'brl',
-            'clp',
-            'czk',
-            'huf',
-            'isk',
-            'mxn',
-            'pln',
-            'ron',
-            'try',
-            'uah',
-            'mdl',
-            'rsd',
-            'rub',
-            'azn',
-            'bdt',
-            'dzd',
-            'gel',
-            'kzt',
-            'tnd',
-            'xaf',
-            'xof',
-            'byn',
-            'pkr',
-            'afn',
-            'all',
-            'amd',
-            'aoa',
-            'ars',
-            'awg',
-            'bam',
-            'bbd',
-            'bhd',
-            'bif',
-            'bnd',
-            'bob',
-            'bsd',
-            'bwp',
-            'bzd',
-            'cdf',
-            'cop',
-            'crc',
-            'cup',
-            'cve',
-            'djf',
-            'dop',
-            'ern',
-            'etb',
-            'fjd',
-            'ghs',
-            'gip',
-            'gmd',
-            'gnf',
-            'gtq',
-            'gyd',
-            'hnl',
-            'htg',
-            'iqd',
-            'jmd',
-            'kes',
-            'kgs',
-            'khr',
-            'kmf',
-            'kwd',
-            'kyd',
-            'lbp',
-            'lkr',
-            'lrd',
-            'lsl',
-            'lyd',
-            'mad',
-            'mga',
-            'mkd',
-            'mmk',
-            'mnt',
-            'mop',
-            'mru',
-            'mur',
-            'mvr',
-            'mwk',
-            'mzn',
-            'nad',
-            'ngn',
-            'nio',
-            'npr',
-            'omr',
-            'pab',
-            'pen',
-            'pyg',
-            'rwf',
-            'sbd',
-            'scr',
-            'sdg',
-            'sos',
-            'srd',
-            'ssp',
-            'stn',
-            'svc',
-            'szl',
-            'tjs',
-            'tmt',
-            'top',
-            'ttd',
-            'tzs',
-            'ugx',
-            'uyu',
-            'uzs',
-            'ves',
-            'vuv',
-            'wst',
-            'xcd',
-            'xcg',
-            'xpf',
-            'yer',
-            'zmw',
-            'irr',
-            'lak',
-            'syp',
-        ];
+        // get available currencies.
+        $noErrors = true;
+        Currency::query()->chunkById(100, fn (Collection $chunk) => $chunk
+            ->each(function (Currency $currency) use (&$noErrors) {
+                try {
+                    $this->processCurrency($currency);
+                } catch (\Exception $e) {
+                    $this->error($e->getMessage());
+                    $noErrors = false;
+                }
+            })
+        );
+
+        return $noErrors ? self::SUCCESS : self::FAILURE;
+    }
+
+    private function processSingeItem(Name $name): int
+    {
+        if (!$this->validateCurrency($name)) {
+            $this->warn('Invalid currency');
+            return self::INVALID;
+        }
+
+        $currency = $this->currencyService->findOrCreate($name);
+        $noErrors = true;
+
+        try {
+            $this->processCurrency($currency);
+        } catch (\Exception $e) {
+            $this->error($e->getMessage());
+            $noErrors = false;
+        }
+
+        return $noErrors ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * @throws \Exception
+     */
+    private function processCurrency(Currency $currency): void
+    {
+        $feed = $this->fetchFeed($currency);
+
+        if ($feed === null) {
+            throw new \Exception('Feed not found');
+        }
+
+        $feed->each(fn (ExchangeRateInfo $exchangeRateInfo) => $this->processCurrencyExchangeRate(
+            $currency,
+            $exchangeRateInfo
+        ));
+    }
+
+    private function processCurrencyExchangeRate(Currency $baseCurrency, ExchangeRateInfo $exchangeRateInfo): void
+    {
+        $targetCurrency = $this->currencyService->findOrCreate($exchangeRateInfo->currency);
+        $this->currencyService->storeCurrencyExchangeRate(
+            $baseCurrency,
+            $targetCurrency,
+            $exchangeRateInfo->rate,
+            $this->today
+        );
+
+        $this->info(sprintf('Currency exchange rate stored for %s to %s', $baseCurrency->name, $targetCurrency->name));
+    }
+
+    private function fetchFeed(Currency $currency): ?Collection
+    {
+        $url = sprintf(self::CURRENCY_FEED_URL, $currency->name);
+
+        try {
+            $response = Http::get($url);
+        } catch (ConnectionException $e) {
+            $this->error((string)$e->getCode());
+            return null;
+        }
+
+        if (!$response->successful()) {
+            $this->error('Invalid response');
+            return null;
+        }
+
+        $feed = Collection::empty();
+        foreach ($response->json() as $currency => $data) {
+            $feed->add(new ExchangeRateInfo(
+                new Name($currency),
+                new Rate($data['rate']),
+            ));
+        }
+
+        $this->info('Feed fetched successfully');
+        return $feed;
+    }
+
+    private function validateCurrency(Name $name): bool
+    {
+        $url = sprintf(self::CURRENCY_FEED_URL, $name->value);
+
+        try {
+            return Http::get($url)->successful();
+        } catch (ConnectionException $e) {
+            $this->error((string)$e->getCode());
+        }
+        return false;
     }
 }
