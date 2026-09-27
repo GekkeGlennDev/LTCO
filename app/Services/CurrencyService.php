@@ -13,6 +13,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 
@@ -45,21 +46,42 @@ class CurrencyService
         return Currency::query()->createOrFirst(['name' => $name->value]);
     }
 
-    public function storeCurrencyExchangeRate(
-        Currency $baseCurrency,
-        Currency $targetCurrency,
-        Rate $rate,
-        CarbonImmutable $validOn
-    ): ExchangeRate {
-        return ExchangeRate::query()->createOrFirst(
-            attributes: [
-                'base_currency_id' => $baseCurrency->id,
-                'target_currency_id' => $targetCurrency->id,
-                'valid_on' => $validOn->toDateString(),
-            ],
-            values: [
-                'rate' => $rate->value,
-            ]
+    /**
+     * Store a complete feed with a few bulk queries instead of one query per exchange rate.
+     *
+     * @param Collection<int, ExchangeRateInfo> $feed
+     */
+    public function storeExchangeRates(Currency $baseCurrency, Collection $feed, CarbonImmutable $validOn): void
+    {
+        if ($feed->isEmpty()) {
+            return;
+        }
+
+        $now = now();
+        $names = $feed->map(fn (ExchangeRateInfo $info) => $info->currency->value);
+
+        // Bulk inserts bypass model events, so flush the cache when new currencies were added.
+        $inserted = Currency::query()->insertOrIgnore($names
+            ->map(fn (string $name) => ['name' => $name, 'created_at' => $now, 'updated_at' => $now])
+            ->all());
+
+        if ($inserted > 0) {
+            $this->flushCache();
+        }
+
+        $currencyIds = Currency::query()->whereIn('name', $names)->pluck('id', 'name');
+
+        ExchangeRate::query()->upsert(
+            values: $feed
+                ->map(fn (ExchangeRateInfo $info) => [
+                    'base_currency_id' => $baseCurrency->id,
+                    'target_currency_id' => $currencyIds[$info->currency->value],
+                    'rate' => $info->rate->value,
+                    'valid_on' => $validOn->toDateString(),
+                ])
+                ->all(),
+            uniqueBy: ['base_currency_id', 'target_currency_id', 'valid_on'],
+            update: ['rate'],
         );
     }
 
@@ -91,6 +113,6 @@ class CurrencyService
 
     public function getLastFetched(): ?CarbonImmutable
     {
-        return $this->cache->get(CurrencyService::CACHE_KEY_FETCHED_AT);
+        return Carbon::make($this->cache->get(CurrencyService::CACHE_KEY_FETCHED_AT))->toImmutable();
     }
 }

@@ -23,7 +23,7 @@ class HomeController extends Controller
             ->values();
 
         $isFetching = $currencyService->isFetching();
-        $lastFetched = $currencyService->getLastFetched()?->toFormattedDateString() ?? 'Never';
+        $lastFetched = $currencyService->getLastFetched()?->toDateTimeString() ?? 'Never';
 
         return view('home', [
             'currencies' => $currencyService->all(),

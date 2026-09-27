@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Processors;
 
-use App\DTOs\ExchangeRateInfo;
 use App\Models\Currency;
 use App\Services\CurrencyService;
 use Carbon\CarbonImmutable;
@@ -30,14 +29,6 @@ readonly class CurrencyFeedProcessor
             return;
         }
 
-        foreach ($feed as $exchangeRateInfo) {
-            $targetCurrency = $this->currencyService->findOrCreate($exchangeRateInfo->currency);
-            $this->currencyService->storeCurrencyExchangeRate(
-                $baseCurrency,
-                $targetCurrency,
-                $exchangeRateInfo->rate,
-                $validOnDate
-            );
-        }
+        $this->currencyService->storeExchangeRates($baseCurrency, $feed, $validOnDate);
     }
 }
