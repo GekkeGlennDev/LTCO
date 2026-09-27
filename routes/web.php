@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\HomeController;
 use Illuminate\Support\Facades\Route;
 
@@ -11,6 +12,7 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware(['auth', 'auth.session'])->group(function () {
     Route::get('/', HomeController::class)->name('home');
+    Route::post('/', CurrencyController::class)->name('currency.fetch');
 
     Route::post('logout', [LoginController::class, 'logout'])->name('logout');
 });

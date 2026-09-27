@@ -22,11 +22,16 @@ class HomeController extends Controller
             ->sortBy(fn (ExchangeRate $rate) => $rate->targetCurrency->name)
             ->values();
 
+        $isFetching = $currencyService->isFetching();
+        $lastFetched = $currencyService->getLastFetched()?->toFormattedDateString() ?? 'Never';
+
         return view('home', [
             'currencies' => $currencyService->all(),
             'currency' => $currency,
             'amount' => $amount,
             'rates' => $rates,
+            'lastFetched' => $isFetching ? 'Fetching...' : $lastFetched,
+            'fetching' => $isFetching,
         ]);
     }
 }
