@@ -17,6 +17,8 @@ class CurrencyController
             Bus::dispatch(new FetchCurrencyExchangeRates());
         }
 
-        return redirect()->route('home');
+        return redirect()
+            ->route('home')
+            ->with('status', 'Starting fetching currency exchange rates. This may take a while.');
     }
 }

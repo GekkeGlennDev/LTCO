@@ -43,6 +43,9 @@
                 <strong>{{ config('app.name') }}</strong>
                 <nav>
                     <a href="{{ route('home') }}">Home</a>
+                    @can('admin')
+                        <a href="{{ route('admin.allowed-ips.index') }}">Allowed IPs</a>
+                    @endcan
                 </nav>
                 <span class="hint">{{ auth()->user()->name }}</span>
                 <form method="POST" action="{{ route('logout') }}" class="inline">
