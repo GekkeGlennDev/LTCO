@@ -7,6 +7,47 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Setup met Docker (Laravel Sail)
+
+De applicatie runs in Docker via [Laravel Sail](https://laravel.com/docs/sail) 
+
+1. **Create environment**
+
+   ```bash
+   cp .env.example .env
+   ```
+2. **Build & starting containers** 
+
+   ```bash
+   docker compose build
+   docker compose up -d
+   ```
+3. **Install Composer dependencies**
+
+   ```bash
+   docker compose exec laravel.test composer install
+   ```
+4. **Setup laravel**
+
+   ```bash
+   ./vendor/bin/sail artisan key:generate
+   ./vendor/bin/sail artisan migrate --seed
+   ```
+   The DatabaseSeeder makes an admin user (`admin@example.com` / `Welkom01!`). To create own user, you can use the command: `./vendor/bin/sail artisan app:create-user` or use the interface.
+
+5. **Add your IP-address to the whitelist**
+
+   ```bash
+   ./vendor/bin/sail artisan app:allow-ip 192.168.0.0/16 --description="Local via Docker"
+   ```
+
+6. **Fetching Exchange rates**
+
+   ```bash
+   ./vendor/bin/sail artisan app:fetch-currency-feed
+   ./vendor/bin/sail artisan queue:work
+   ```
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
