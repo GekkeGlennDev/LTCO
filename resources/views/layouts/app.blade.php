@@ -44,6 +44,7 @@
                 <nav>
                     <a href="{{ route('home') }}">Home</a>
                     @can('admin')
+                        <a href="{{ route('admin.users.index') }}">Users</a>
                         <a href="{{ route('admin.allowed-ips.index') }}">Allowed IPs</a>
                     @endcan
                 </nav>

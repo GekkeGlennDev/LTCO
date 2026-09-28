@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AllowedIpController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\HomeController;
@@ -20,7 +21,7 @@ Route::middleware(['auth', 'auth.session'])->group(function () {
     Route::group([
         'prefix' => 'admin',
         'as' => 'admin.',
-        'middleware' => 'can:admin'
+        'middleware' => 'can:admin',
     ], function () {
         Route::group([
             'prefix' => 'allowed-ips',
@@ -30,5 +31,7 @@ Route::middleware(['auth', 'auth.session'])->group(function () {
             Route::post('/', [AllowedIpController::class, 'store'])->name('store');
             Route::delete('/{AllowedIp:id}', [AllowedIpController::class, 'destroy'])->name('destroy');
         });
+
+        Route::resource('users', UserController::class)->except('show');
     });
 });

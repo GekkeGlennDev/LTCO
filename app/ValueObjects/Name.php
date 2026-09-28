@@ -6,14 +6,10 @@ namespace App\ValueObjects;
 
 readonly class Name
 {
-    public string $value;
-
-    public function __construct(string $name)
+    public function __construct(public string $value)
     {
-        if (strlen($name) > 10) {
+        if (strlen($this->value) > 10) {
             throw new \InvalidArgumentException('Name must be 10 or less than characters');
         }
-
-        $this->value = $name;
     }
 }

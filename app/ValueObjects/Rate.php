@@ -8,13 +8,12 @@ readonly class Rate
 {
     public float $value;
 
-    public function __construct(string $rate)
+    public function __construct(string $value)
     {
-        if (!is_numeric($rate))
-        {
+        if (!is_numeric($value)) {
             throw new \InvalidArgumentException('Rate must be numeric');
         }
 
-        $this->value = floatval($rate);
+        $this->value = floatval($value);
     }
 }
